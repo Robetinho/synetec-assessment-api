@@ -2,22 +2,20 @@
 using SynetecAssessmentApi.Domain;
 using SynetecAssessmentApi.Dtos;
 using SynetecAssessmentApi.Persistence;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace SynetecAssessmentApi.Services
 {
-    public class BonusPoolService
+    public class BonusPoolService : IBonusPoolService
     {
         private readonly AppDbContext _dbContext;
 
-        public BonusPoolService()
+        public BonusPoolService(AppDbContext dbContext)
         {
-            var dbContextOptionBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            dbContextOptionBuilder.UseInMemoryDatabase(databaseName: "HrDb");
-
-            _dbContext = new AppDbContext(dbContextOptionBuilder.Options);
+            _dbContext = dbContext;
         }
 
         public async Task<IEnumerable<EmployeeDto>> GetEmployeesAsync()
@@ -55,12 +53,18 @@ namespace SynetecAssessmentApi.Services
                 .Include(e => e.Department)
                 .FirstOrDefaultAsync(item => item.Id == selectedEmployeeId);
 
+            if (employee == null)
+            {
+                throw new Exception($"Employee with Employee Id {selectedEmployeeId} not found");
+                //handles both unsupplied and invalid id, I didn't think unsupplied id justified its own validation
+            }
+
             //get the total salary budget for the company
             int totalSalary = (int)_dbContext.Employees.Sum(item => item.Salary);
 
             //calculate the bonus allocation for the employee
             decimal bonusPercentage = (decimal)employee.Salary / (decimal)totalSalary;
-            int bonusAllocation = (int)(bonusPercentage * bonusPoolAmount);
+            decimal bonusAllocation = Math.Round(bonusPercentage * bonusPoolAmount, 2);
 
             return new BonusPoolCalculatorResultDto
             {
